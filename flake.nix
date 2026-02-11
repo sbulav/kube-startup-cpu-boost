@@ -60,6 +60,14 @@
           shellHook = ''
             export CGO_ENABLED=0
             export GOFLAGS="-mod=readonly"
+            export PODMAN_SHORTNAME_MODE=permissive
+
+            # Setup Podman configuration
+            mkdir -p ~/.config/containers
+            if [ ! -f ~/.config/containers/policy.json ]; then
+              echo '{"default": [{"type": "insecureAcceptAnything"}]}' > ~/.config/containers/policy.json
+            fi
+
             # Install controller tools if needed
             if ! command -v controller-gen >/dev/null 2>&1; then
               go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.3

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Build the manager binary
-FROM golang:1.23 as builder
+FROM docker.io/library/golang:1.23 as builder
 ARG TARGETOS
 ARG TARGETARCH
 
