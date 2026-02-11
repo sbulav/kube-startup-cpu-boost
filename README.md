@@ -22,6 +22,7 @@ Note: this is not an officially supported Google product.
   * [[Boost target] POD label selector](#boost-target-pod-label-selector)
   * [[Boost resources] percentage increase](#boost-resources-percentage-increase)
   * [[Boost resources] fixed target](#boost-resources-fixed-target)
+  * [[Boost resources] wildcard container policy](#boost-resources-wildcard-container-policy)
   * [[Boost duration] fixed time](#boost-duration-fixed-time)
   * [[Boost duration] POD condition](#boost-duration-pod-condition)
 * [Configuration](#configuration)
@@ -52,7 +53,7 @@ given period of time or when the POD condition is met.
 
  <!-- x-release-please-start-version -->
 ```sh
-kubectl apply -f https://github.com/google/kube-startup-cpu-boost/releases/download/v0.17.1/manifests.yaml
+kubectl apply -f https://github.com/google/kube-startup-cpu-boost/releases/download/v0.18.0/manifests.yaml
 ```
  <!-- x-release-please-end -->
 
@@ -69,7 +70,7 @@ cat <<EOF > kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- https://github.com/google/kube-startup-cpu-boost?ref=v0.17.1
+- https://github.com/google/kube-startup-cpu-boost?ref=v0.18.0
 EOF
 kubectl kustomize | kubectl apply -f -
 ```
@@ -129,6 +130,11 @@ gcloud container clusters create poc \
    [POD Condition](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions)
    `Ready` becomes `True`.
 
+   > **Tip:** Use `containerName: "*"` to apply the boost to all containers
+   > in the matched PODs. See
+   > [wildcard container policy](#boost-resources-wildcard-container-policy)
+   > for details.
+
 2. Schedule your workloads and observe the results
 
 ## Features
@@ -175,6 +181,28 @@ spec:
          requests: "1"
          limits: "2"
 ```
+
+### [Boost resources] wildcard container policy
+
+Use `containerName: "*"` to apply a resource policy to all containers in the
+matched PODs without listing each container by name. Named container policies
+take priority over the wildcard, so you can set a default boost for all
+containers and override it for specific ones.
+
+```yaml
+spec:
+  resourcePolicy:
+    containerPolicies:
+    - containerName: "*"
+      percentageIncrease:
+        value: 50
+    - containerName: sidecar
+      percentageIncrease:
+        value: 20
+```
+
+In the example above all containers get a 50% CPU boost except the `sidecar`
+container which gets a 20% boost.
 
 ### [Boost duration] fixed time
 

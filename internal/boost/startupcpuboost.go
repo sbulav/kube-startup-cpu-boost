@@ -135,9 +135,15 @@ func (b *StartupCPUBoostImpl) Namespace() string {
 	return b.namespace
 }
 
-// ResourcePolicy returns the resource policy for a given container
+// ResourcePolicy returns the resource policy for a given container.
+// If no policy is found for the exact container name, it falls back to
+// the wildcard ("*") policy if one is configured.
 func (b *StartupCPUBoostImpl) ResourcePolicy(containerName string) (resource.ContainerPolicy, bool) {
 	policy, ok := b.resourcePolicies[containerName]
+	if ok {
+		return policy, true
+	}
+	policy, ok = b.resourcePolicies[autoscaling.ContainerPolicyWildcard]
 	return policy, ok
 }
 

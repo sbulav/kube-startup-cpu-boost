@@ -99,11 +99,21 @@ func validateDurationPolicy(policy v1alpha1.DurationPolicy) *field.Error {
 
 func validateContainerPolicies(policies []v1alpha1.ContainerPolicy) field.ErrorList {
 	var allErrs field.ErrorList
+	var wildcardCount int
 	baseFldPath := field.NewPath("spec").
 		Child("resourcePolicy").
 		Child("containerPolicies")
 	for i := range policies {
 		fldPath := baseFldPath.Index(i)
+		if policies[i].ContainerName == v1alpha1.ContainerPolicyWildcard {
+			wildcardCount++
+			if wildcardCount > 1 {
+				allErrs = append(allErrs, field.Invalid(fldPath,
+					policies[i],
+					"only one wildcard (*) container policy is allowed",
+				))
+			}
+		}
 		var cnt int
 		if policies[i].FixedResources != nil {
 			cnt++

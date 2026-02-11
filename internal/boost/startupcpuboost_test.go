@@ -105,6 +105,110 @@ var _ = Describe("StartupCPUBoost", func() {
 				Expect(fixedPolicy.Limits()).To(Equal(containerTwoFixedLim))
 			})
 		})
+		When("the spec has wildcard resource policy", func() {
+			var (
+				wildcardPercValue int64 = 50
+			)
+			BeforeEach(func() {
+				spec.Spec.ResourcePolicy = autoscaling.ResourcePolicy{
+					ContainerPolicies: []autoscaling.ContainerPolicy{
+						{
+							ContainerName: autoscaling.ContainerPolicyWildcard,
+							PercentageIncrease: &autoscaling.PercentageIncrease{
+								Value: wildcardPercValue,
+							},
+						},
+					},
+				}
+			})
+			It("does not error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("returns wildcard policy for any container name", func() {
+				p, ok := boost.ResourcePolicy("unknown-container")
+				Expect(ok).To(BeTrue())
+				Expect(p).To(BeAssignableToTypeOf(&resource.PercentageContainerPolicy{}))
+				percPolicy, _ := p.(*resource.PercentageContainerPolicy)
+				Expect(percPolicy.Percentage()).To(Equal(wildcardPercValue))
+			})
+			It("returns wildcard policy for another container name", func() {
+				p, ok := boost.ResourcePolicy("another-container")
+				Expect(ok).To(BeTrue())
+				Expect(p).To(BeAssignableToTypeOf(&resource.PercentageContainerPolicy{}))
+			})
+		})
+		When("the spec has wildcard mixed with named container policies", func() {
+			var (
+				namedContainerName       = "sidecar"
+				namedPercValue     int64 = 20
+				wildcardFixedReq         = apiResource.MustParse("2")
+				wildcardFixedLim         = apiResource.MustParse("4")
+			)
+			BeforeEach(func() {
+				spec.Spec.ResourcePolicy = autoscaling.ResourcePolicy{
+					ContainerPolicies: []autoscaling.ContainerPolicy{
+						{
+							ContainerName: namedContainerName,
+							PercentageIncrease: &autoscaling.PercentageIncrease{
+								Value: namedPercValue,
+							},
+						},
+						{
+							ContainerName: autoscaling.ContainerPolicyWildcard,
+							FixedResources: &autoscaling.FixedResources{
+								Requests: wildcardFixedReq,
+								Limits:   wildcardFixedLim,
+							},
+						},
+					},
+				}
+			})
+			It("does not error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("returns named policy for the named container", func() {
+				p, ok := boost.ResourcePolicy(namedContainerName)
+				Expect(ok).To(BeTrue())
+				Expect(p).To(BeAssignableToTypeOf(&resource.PercentageContainerPolicy{}))
+				percPolicy, _ := p.(*resource.PercentageContainerPolicy)
+				Expect(percPolicy.Percentage()).To(Equal(namedPercValue))
+			})
+			It("returns wildcard policy for an unnamed container", func() {
+				p, ok := boost.ResourcePolicy("some-other-container")
+				Expect(ok).To(BeTrue())
+				Expect(p).To(BeAssignableToTypeOf(&resource.FixedPolicy{}))
+				fixedPolicy, _ := p.(*resource.FixedPolicy)
+				Expect(fixedPolicy.Requests()).To(Equal(wildcardFixedReq))
+				Expect(fixedPolicy.Limits()).To(Equal(wildcardFixedLim))
+			})
+			It("does not return wildcard policy for named container", func() {
+				p, ok := boost.ResourcePolicy(namedContainerName)
+				Expect(ok).To(BeTrue())
+				_, isFixed := p.(*resource.FixedPolicy)
+				Expect(isFixed).To(BeFalse())
+			})
+		})
+		When("the spec has no wildcard and container name does not match", func() {
+			BeforeEach(func() {
+				spec.Spec.ResourcePolicy = autoscaling.ResourcePolicy{
+					ContainerPolicies: []autoscaling.ContainerPolicy{
+						{
+							ContainerName: "specific-container",
+							PercentageIncrease: &autoscaling.PercentageIncrease{
+								Value: 50,
+							},
+						},
+					},
+				}
+			})
+			It("does not error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("returns false for unknown container", func() {
+				_, ok := boost.ResourcePolicy("unknown-container")
+				Expect(ok).To(BeFalse())
+			})
+		})
 		When("the spec has container policy without resource policy", func() {
 			BeforeEach(func() {
 				spec.Spec.ResourcePolicy = autoscaling.ResourcePolicy{

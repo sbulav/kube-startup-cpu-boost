@@ -177,5 +177,97 @@ var _ = Describe("StartupCPUBoost webhook", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
+		When("Startup CPU Boost has wildcard container policy with valid resource policy", func() {
+			BeforeEach(func() {
+				boost = v1alpha1.StartupCPUBoost{
+					Spec: v1alpha1.StartupCPUBoostSpec{
+						ResourcePolicy: v1alpha1.ResourcePolicy{
+							ContainerPolicies: []v1alpha1.ContainerPolicy{
+								{
+									ContainerName:      v1alpha1.ContainerPolicyWildcard,
+									PercentageIncrease: &v1alpha1.PercentageIncrease{Value: 50},
+								},
+							},
+						},
+						DurationPolicy: v1alpha1.DurationPolicy{
+							PodCondition: &v1alpha1.PodConditionDurationPolicy{},
+						},
+					},
+				}
+			})
+			It("does not error", func() {
+				By("validating create event")
+				_, err = w.ValidateCreate(context.TODO(), &boost)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("validating update event")
+				_, err = w.ValidateUpdate(context.TODO(), nil, &boost)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		When("Startup CPU Boost has wildcard mixed with named container policies", func() {
+			BeforeEach(func() {
+				boost = v1alpha1.StartupCPUBoost{
+					Spec: v1alpha1.StartupCPUBoostSpec{
+						ResourcePolicy: v1alpha1.ResourcePolicy{
+							ContainerPolicies: []v1alpha1.ContainerPolicy{
+								{
+									ContainerName:      "container-one",
+									PercentageIncrease: &v1alpha1.PercentageIncrease{Value: 20},
+								},
+								{
+									ContainerName:  v1alpha1.ContainerPolicyWildcard,
+									FixedResources: &v1alpha1.FixedResources{},
+								},
+							},
+						},
+						DurationPolicy: v1alpha1.DurationPolicy{
+							PodCondition: &v1alpha1.PodConditionDurationPolicy{},
+						},
+					},
+				}
+			})
+			It("does not error", func() {
+				By("validating create event")
+				_, err = w.ValidateCreate(context.TODO(), &boost)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("validating update event")
+				_, err = w.ValidateUpdate(context.TODO(), nil, &boost)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		When("Startup CPU Boost has duplicate wildcard container policies", func() {
+			BeforeEach(func() {
+				boost = v1alpha1.StartupCPUBoost{
+					Spec: v1alpha1.StartupCPUBoostSpec{
+						ResourcePolicy: v1alpha1.ResourcePolicy{
+							ContainerPolicies: []v1alpha1.ContainerPolicy{
+								{
+									ContainerName:      v1alpha1.ContainerPolicyWildcard,
+									PercentageIncrease: &v1alpha1.PercentageIncrease{Value: 50},
+								},
+								{
+									ContainerName:  v1alpha1.ContainerPolicyWildcard,
+									FixedResources: &v1alpha1.FixedResources{},
+								},
+							},
+						},
+						DurationPolicy: v1alpha1.DurationPolicy{
+							PodCondition: &v1alpha1.PodConditionDurationPolicy{},
+						},
+					},
+				}
+			})
+			It("errors", func() {
+				By("validating create event")
+				_, err = w.ValidateCreate(context.TODO(), &boost)
+				Expect(err).To(HaveOccurred())
+
+				By("validating update event")
+				_, err = w.ValidateUpdate(context.TODO(), nil, &boost)
+				Expect(err).To(HaveOccurred())
+			})
+		})
 	})
 })

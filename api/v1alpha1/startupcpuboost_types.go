@@ -30,6 +30,10 @@ const (
 	FixedDurationPolicyUnitMin FixedDurationPolicyUnit = "Minutes"
 )
 
+// ContainerPolicyWildcard is the special value for ContainerPolicy.ContainerName
+// that matches all containers without a container-specific policy.
+const ContainerPolicyWildcard = "*"
+
 // FixedDurationPolicy defines the fixed time duration policy
 type FixedDurationPolicy struct {
 	// unit of time for a fixed time policy
@@ -84,7 +88,9 @@ type PercentageIncrease struct {
 // ContainerPolicy defines the policy used to determine the target
 // resources for a container
 type ContainerPolicy struct {
-	// ContainerName specifies the name of container for a given policy
+	// ContainerName specifies the name of container for a given policy.
+	// Use "*" to apply the policy to all containers that don't have
+	// a container-specific policy defined.
 	// +kubebuilder:validation:Required
 	ContainerName string `json:"containerName,omitempty"`
 	// PercentageIncrease specifies the CPU resource policy that increases

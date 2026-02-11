@@ -23,7 +23,7 @@
           version = "0.1.0";
           src = ./.;
 
-          vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          vendorHash = "sha256-Y7fnOgNfB3VKeh0ahbXOzwMR1Z+uLsuo7RHQIBfLrQU=";
 
           env = {
             CGO_ENABLED = "0";
@@ -35,7 +35,7 @@
         };
 
         baseTools = with pkgs; [
-          go_1_23
+          go_1_24
           gopls
           golangci-lint
           delve
