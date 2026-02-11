@@ -22,5 +22,8 @@ func Setup(mgr ctrl.Manager) (string, error) {
 	if err := setupWebhookForStartupCPUBoost(mgr); err != nil {
 		return "StartupCPUBoost", err
 	}
+	if err := setupWebhookForGlobalStartupCPUBoost(mgr); err != nil {
+		return "GlobalStartupCPUBoost", err
+	}
 	return "", nil
 }

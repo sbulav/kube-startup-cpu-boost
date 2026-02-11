@@ -11,6 +11,14 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - pods
   verbs:
   - get
@@ -53,6 +61,32 @@ rules:
 - apiGroups:
   - autoscaling.x-k8s.io
   resources:
+  - globalstartupcpuboosts
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - autoscaling.x-k8s.io
+  resources:
+  - globalstartupcpuboosts/finalizers
+  - startupcpuboosts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - autoscaling.x-k8s.io
+  resources:
+  - globalstartupcpuboosts/status
+  - startupcpuboosts/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - autoscaling.x-k8s.io
+  resources:
   - startupcpuboosts
   verbs:
   - create
@@ -62,17 +96,3 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - autoscaling.x-k8s.io
-  resources:
-  - startupcpuboosts/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - autoscaling.x-k8s.io
-  resources:
-  - startupcpuboosts/status
-  verbs:
-  - get
-  - patch
-  - update

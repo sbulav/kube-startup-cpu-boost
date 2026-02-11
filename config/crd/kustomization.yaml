@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/autoscaling.x-k8s.io_startupcpuboosts.yaml
+- bases/autoscaling.x-k8s.io_globalstartupcpuboosts.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

@@ -183,6 +183,15 @@ func setupControllers(mgr ctrl.Manager, boostMgr boost.Manager, cfg *config.Conf
 		setupLog.Error(err, "unable to create controller", "controller", "StartupCPUBoost")
 		os.Exit(1)
 	}
+	globalBoostCtrl := &controller.GlobalStartupCPUBoostReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Log:    ctrl.Log.WithName("global-boost-reconciler"),
+	}
+	if err := globalBoostCtrl.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GlobalStartupCPUBoost")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 }
 

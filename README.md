@@ -25,6 +25,7 @@ Note: this is not an officially supported Google product.
   * [[Boost resources] wildcard container policy](#boost-resources-wildcard-container-policy)
   * [[Boost duration] fixed time](#boost-duration-fixed-time)
   * [[Boost duration] POD condition](#boost-duration-pod-condition)
+  * [Global CPU boost](#global-cpu-boost)
 * [Configuration](#configuration)
 * [Metrics](#metrics)
 * [License](#license)
@@ -53,7 +54,7 @@ given period of time or when the POD condition is met.
 
  <!-- x-release-please-start-version -->
 ```sh
-kubectl apply -f https://github.com/google/kube-startup-cpu-boost/releases/download/v0.18.0/manifests.yaml
+kubectl apply -f https://github.com/google/kube-startup-cpu-boost/releases/download/v0.19.0/manifests.yaml
 ```
  <!-- x-release-please-end -->
 
@@ -70,7 +71,7 @@ cat <<EOF > kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- https://github.com/google/kube-startup-cpu-boost?ref=v0.18.0
+- https://github.com/google/kube-startup-cpu-boost?ref=v0.19.0
 EOF
 kubectl kustomize | kubectl apply -f -
 ```
@@ -228,6 +229,55 @@ Define the POD condition, the resource boost effect will last until the conditio
        type: Ready
        status: "True" 
   ```
+
+### Global CPU boost
+
+Use the cluster-scoped `GlobalStartupCPUBoost` resource to distribute a
+`StartupCPUBoost` across multiple namespaces at once. The controller creates
+and manages child `StartupCPUBoost` resources in every namespace that matches
+the `namespaceSelector`.
+
+```yaml
+apiVersion: autoscaling.x-k8s.io/v1alpha1
+kind: GlobalStartupCPUBoost
+metadata:
+  name: java-apps-boost
+spec:
+  namespaceSelector:
+    matchLabels:
+      boost-enabled: "true"
+  template:
+    selector:
+      matchLabels:
+        runtime: jvm
+    spec:
+      resourcePolicy:
+        containerPolicies:
+        - containerName: "*"
+          percentageIncrease:
+            value: 100
+      durationPolicy:
+        fixedDuration:
+          value: 60
+          unit: Seconds
+```
+
+In the example above, every namespace with the `boost-enabled=true` label
+receives a `StartupCPUBoost` named `global-java-apps-boost` that doubles CPU
+for all containers in pods with the `runtime=jvm` label for 60 seconds.
+
+Key behaviors:
+
+* **Namespace-level override**: If a namespace already contains any
+  user-created `StartupCPUBoost`, the global controller skips that namespace
+  entirely, giving local configuration full priority.
+* **Automatic lifecycle**: When a namespace gains or loses the matching label,
+  the child boost is created or removed accordingly.
+* **Cleanup on deletion**: Deleting the `GlobalStartupCPUBoost` removes all
+  managed child boosts across all namespaces.
+* **Status reporting**: The `status` field reports `activeNamespaces` (where
+  children were created) and `skippedNamespaces` (where user-created boosts
+  prevented creation).
 
 ## Configuration
 

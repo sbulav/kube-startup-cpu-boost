@@ -34,6 +34,8 @@
           ];
         };
 
+        dockerWrapper = pkgs.writeShellScriptBin "docker" "exec ${pkgs.podman}/bin/podman \"$@\"";
+
         baseTools = with pkgs; [
           go_1_24
           gopls
@@ -46,6 +48,7 @@
           kubectl
           kind
           podman
+          dockerWrapper
         ];
 
         extraTools = lib.optionals (lib.hasAttr "staticcheck" pkgs) [ pkgs.staticcheck ];
@@ -57,7 +60,6 @@
           shellHook = ''
             export CGO_ENABLED=0
             export GOFLAGS="-mod=readonly"
-            alias docker=podman
             # Install controller tools if needed
             if ! command -v controller-gen >/dev/null 2>&1; then
               go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.3
