@@ -20,7 +20,7 @@
 
         kubePkg = pkgs.buildGoModule {
           pname = "kube-startup-cpu-boost";
-          version = "0.1.0";
+          version = "0.20.0";
           src = ./.;
 
           vendorHash = "sha256-Y7fnOgNfB3VKeh0ahbXOzwMR1Z+uLsuo7RHQIBfLrQU=";

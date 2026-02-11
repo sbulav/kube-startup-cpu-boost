@@ -16,6 +16,7 @@ package boost_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	autoscaling "github.com/google/kube-startup-cpu-boost/api/v1alpha1"
@@ -30,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -37,6 +39,125 @@ var _ = Describe("Manager", func() {
 	var manager cpuboost.Manager
 	BeforeEach(func() {
 		metrics.ClearSystemMetrics()
+	})
+	Describe("syncs boost pods from API on registration", func() {
+		var (
+			spec                *autoscaling.StartupCPUBoost
+			boost               cpuboost.StartupCPUBoost
+			useLegacyRevertMode bool
+			err                 error
+			mockCtrl            *gomock.Controller
+			mockClient          *mock.MockClient
+			pod                 *corev1.Pod
+			podNameLabel        string
+			podNameLabelValue   string
+		)
+		BeforeEach(func() {
+			mockCtrl = gomock.NewController(GinkgoT())
+			mockClient = mock.NewMockClient(mockCtrl)
+			podNameLabel = "app.kubernetes.io/name"
+			podNameLabelValue = "app-001"
+			spec = specTemplate.DeepCopy()
+			spec.Selector = *metav1.AddLabelToSelector(&metav1.LabelSelector{},
+				podNameLabel, podNameLabelValue)
+			pod = podTemplate.DeepCopy()
+			pod.Labels[podNameLabel] = podNameLabelValue
+		})
+		AfterEach(func() {
+			mockCtrl.Finish()
+		})
+		When("API returns labeled pods not yet tracked", func() {
+			BeforeEach(func() {
+				useLegacyRevertMode = false
+				mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+						podList := list.(*corev1.PodList)
+						podList.Items = []corev1.Pod{*pod}
+						return nil
+					}).Times(1)
+			})
+			JustBeforeEach(func() {
+				manager = cpuboost.NewManager(mockClient)
+				boost, err = cpuboost.NewStartupCPUBoost(nil, spec, useLegacyRevertMode)
+				Expect(err).ToNot(HaveOccurred())
+				err = manager.AddRegularCPUBoost(context.TODO(), boost)
+			})
+			It("does not error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("tracks the synced pod", func() {
+				managedPod, ok := boost.Pod(pod.Name)
+				Expect(ok).To(BeTrue())
+				Expect(managedPod.Name).To(Equal(pod.Name))
+			})
+		})
+		When("API returns pods that are already tracked", func() {
+			BeforeEach(func() {
+				useLegacyRevertMode = false
+				mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+						podList := list.(*corev1.PodList)
+						podList.Items = []corev1.Pod{*pod}
+						return nil
+					}).Times(1)
+			})
+			JustBeforeEach(func() {
+				manager = cpuboost.NewManager(mockClient)
+				boost, err = cpuboost.NewStartupCPUBoost(nil, spec, useLegacyRevertMode)
+				Expect(err).ToNot(HaveOccurred())
+				err = boost.UpsertPod(context.TODO(), pod)
+				Expect(err).ToNot(HaveOccurred())
+				err = manager.AddRegularCPUBoost(context.TODO(), boost)
+			})
+			It("does not error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("still tracks the pod", func() {
+				managedPod, ok := boost.Pod(pod.Name)
+				Expect(ok).To(BeTrue())
+				Expect(managedPod.Name).To(Equal(pod.Name))
+			})
+		})
+		When("API returns an error", func() {
+			BeforeEach(func() {
+				useLegacyRevertMode = false
+				mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(fmt.Errorf("API unavailable")).Times(1)
+			})
+			JustBeforeEach(func() {
+				manager = cpuboost.NewManager(mockClient)
+				boost, err = cpuboost.NewStartupCPUBoost(nil, spec, useLegacyRevertMode)
+				Expect(err).ToNot(HaveOccurred())
+				err = manager.AddRegularCPUBoost(context.TODO(), boost)
+			})
+			It("does not error on AddRegularCPUBoost", func() {
+				// syncBoostPods error is logged, not propagated
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("stores the boost", func() {
+				stored, ok := manager.GetRegularCPUBoost(context.TODO(), spec.Name, spec.Namespace)
+				Expect(ok).To(BeTrue())
+				Expect(stored.Name()).To(Equal(spec.Name))
+			})
+		})
+		When("API returns no pods", func() {
+			BeforeEach(func() {
+				useLegacyRevertMode = false
+				mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+						return nil
+					}).Times(1)
+			})
+			JustBeforeEach(func() {
+				manager = cpuboost.NewManager(mockClient)
+				boost, err = cpuboost.NewStartupCPUBoost(nil, spec, useLegacyRevertMode)
+				Expect(err).ToNot(HaveOccurred())
+				err = manager.AddRegularCPUBoost(context.TODO(), boost)
+			})
+			It("does not error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
 	})
 	Describe("Registers startup-cpu-boost", func() {
 		var (

@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	autoscaling "github.com/google/kube-startup-cpu-boost/api/v1alpha1"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/kube-startup-cpu-boost/internal/boost/duration"
+	bpod "github.com/google/kube-startup-cpu-boost/internal/boost/pod"
 	"github.com/google/kube-startup-cpu-boost/internal/metrics"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -84,7 +86,7 @@ type TimeTicker interface {
 }
 
 type timeTickerImpl struct {
-	t time.Ticker
+	t *time.Ticker
 }
 
 func (t *timeTickerImpl) Tick() <-chan time.Time {
@@ -97,7 +99,7 @@ func (t *timeTickerImpl) Stop() {
 
 func newTimeTickerImpl(d time.Duration) TimeTicker {
 	return &timeTickerImpl{
-		t: *time.NewTicker(d),
+		t: time.NewTicker(d),
 	}
 }
 
@@ -108,7 +110,7 @@ type podRevertTask struct {
 
 type managerImpl struct {
 	sync.RWMutex
-	isRunning     bool
+	isRunning     atomic.Bool
 	client        client.Client
 	reconciler    reconcile.Reconciler
 	ticker        TimeTicker
@@ -264,13 +266,13 @@ func (m *managerImpl) Start(ctx context.Context) error {
 }
 
 func (m *managerImpl) IsRunning(ctx context.Context) bool {
-	return m.isRunning
+	return m.isRunning.Load()
 }
 
 // PRIVATE FUNCS START below
 
 func (m *managerImpl) setRunning(isRunning bool) {
-	m.isRunning = isRunning
+	m.isRunning.Store(isRunning)
 }
 
 // getMatchingBoost finds the most specific matching boost for a given pod.
@@ -294,6 +296,49 @@ func (m *managerImpl) postProcessNewBoost(ctx context.Context, boost StartupCPUB
 	if err := m.mapOrphanedPods(ctx, boost); err != nil {
 		log.Error(err, "failed to map orphaned pods")
 	}
+	if err := m.syncBoostPods(ctx, boost); err != nil {
+		log.Error(err, "failed to sync boost pods from API")
+	}
+}
+
+// syncBoostPods lists pods from the API server (via informer cache) that are
+// labeled for the given boost and re-registers any that are not already tracked.
+// This ensures that pods boosted before a controller restart are re-tracked so
+// their resources can be properly reverted when the duration policy expires.
+func (m *managerImpl) syncBoostPods(ctx context.Context, boost StartupCPUBoost) error {
+	if m.client == nil {
+		return nil
+	}
+	log := m.log.WithValues("boost", boost.Name(), "namespace", boost.Namespace())
+	var podList corev1.PodList
+	if err := m.client.List(ctx, &podList,
+		client.InNamespace(boost.Namespace()),
+		client.MatchingLabels{bpod.BoostLabelKey: boost.Name()},
+	); err != nil {
+		return fmt.Errorf("failed to list pods for boost %s/%s: %w", boost.Namespace(), boost.Name(), err)
+	}
+	if len(podList.Items) == 0 {
+		return nil
+	}
+	errs := make([]error, 0)
+	synced := 0
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if _, ok := boost.Pod(pod.Name); ok {
+			log.V(5).Info("pod already tracked, skipping sync", "pod", pod.Name)
+			continue
+		}
+		log.V(5).Info("syncing previously boosted pod", "pod", pod.Name)
+		if err := boost.UpsertPod(ctx, pod); err != nil {
+			errs = append(errs, fmt.Errorf("failed to sync pod %s: %w", pod.Name, err))
+		} else {
+			synced++
+		}
+	}
+	if synced > 0 {
+		log.Info("synced previously boosted pods", "count", synced)
+	}
+	return errors.Join(errs...)
 }
 
 // mapOrphanedPods maps orphaned pods to the given boost if they match.
