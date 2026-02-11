@@ -134,8 +134,10 @@ spec:
                         resources for a container
                       properties:
                         containerName:
-                          description: ContainerName specifies the name of container
-                            for a given policy
+                          description: |-
+                            ContainerName specifies the name of container for a given policy.
+                            Use "*" to apply the policy to all containers that don't have
+                            a container-specific policy defined.
                           type: string
                         fixedResources:
                           description: |-
