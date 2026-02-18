@@ -19,7 +19,7 @@ import (
 
 	"github.com/google/kube-startup-cpu-boost/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -67,15 +67,15 @@ func (w *GlobalStartupCPUBoostWebhook) ValidateDelete(ctx context.Context, obj r
 func validateGlobal(boost *v1alpha1.GlobalStartupCPUBoost) error {
 	var allErrs field.ErrorList
 
-	// Validate namespace selector
+	// Validate namespace selector (including MatchLabels and MatchExpressions)
 	nsFldPath := field.NewPath("spec").Child("namespaceSelector")
-	if _, err := labels.Parse(labels.Set(boost.Spec.NamespaceSelector.MatchLabels).String()); err != nil {
+	if _, err := metav1.LabelSelectorAsSelector(&boost.Spec.NamespaceSelector); err != nil {
 		allErrs = append(allErrs, field.Invalid(nsFldPath, boost.Spec.NamespaceSelector, err.Error()))
 	}
 
-	// Validate template pod selector
+	// Validate template pod selector (including MatchLabels and MatchExpressions)
 	selectorFldPath := field.NewPath("spec").Child("template").Child("selector")
-	if _, err := labels.Parse(labels.Set(boost.Spec.Template.Selector.MatchLabels).String()); err != nil {
+	if _, err := metav1.LabelSelectorAsSelector(&boost.Spec.Template.Selector); err != nil {
 		allErrs = append(allErrs, field.Invalid(selectorFldPath, boost.Spec.Template.Selector, err.Error()))
 	}
 

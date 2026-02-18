@@ -81,6 +81,165 @@ var _ = Describe("GlobalStartupCPUBoost webhook", func() {
 			})
 		})
 
+		When("valid GlobalStartupCPUBoost with MatchExpressions in selectors", func() {
+			BeforeEach(func() {
+				boost = v1alpha1.GlobalStartupCPUBoost{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "global-boost-matchexpr",
+					},
+					Spec: v1alpha1.GlobalStartupCPUBoostSpec{
+						NamespaceSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "env",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"prod", "staging"},
+								},
+							},
+						},
+						Template: v1alpha1.GlobalStartupCPUBoostTemplate{
+							Selector: metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpExists,
+										Values:   []string{},
+									},
+								},
+							},
+							Spec: v1alpha1.StartupCPUBoostSpec{
+								ResourcePolicy: v1alpha1.ResourcePolicy{
+									ContainerPolicies: []v1alpha1.ContainerPolicy{
+										{
+											ContainerName:      v1alpha1.ContainerPolicyWildcard,
+											PercentageIncrease: &v1alpha1.PercentageIncrease{Value: 100},
+										},
+									},
+								},
+								DurationPolicy: v1alpha1.DurationPolicy{
+									Fixed: &v1alpha1.FixedDurationPolicy{
+										Value: 60,
+										Unit:  v1alpha1.FixedDurationPolicyUnitSec,
+									},
+								},
+							},
+						},
+					},
+				}
+			})
+			It("does not error", func() {
+				By("validating create event")
+				_, err = w.ValidateCreate(context.TODO(), &boost)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("validating update event")
+				_, err = w.ValidateUpdate(context.TODO(), nil, &boost)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("GlobalStartupCPUBoost has invalid MatchExpressions in namespace selector", func() {
+			BeforeEach(func() {
+				boost = v1alpha1.GlobalStartupCPUBoost{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "global-boost-invalid-ns-expr",
+					},
+					Spec: v1alpha1.GlobalStartupCPUBoostSpec{
+						NamespaceSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "env",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{},
+								},
+							},
+						},
+						Template: v1alpha1.GlobalStartupCPUBoostTemplate{
+							Selector: metav1.LabelSelector{
+								MatchLabels: map[string]string{"app": "java"},
+							},
+							Spec: v1alpha1.StartupCPUBoostSpec{
+								ResourcePolicy: v1alpha1.ResourcePolicy{
+									ContainerPolicies: []v1alpha1.ContainerPolicy{
+										{
+											ContainerName:      v1alpha1.ContainerPolicyWildcard,
+											PercentageIncrease: &v1alpha1.PercentageIncrease{Value: 100},
+										},
+									},
+								},
+								DurationPolicy: v1alpha1.DurationPolicy{
+									Fixed: &v1alpha1.FixedDurationPolicy{
+										Value: 60,
+										Unit:  v1alpha1.FixedDurationPolicyUnitSec,
+									},
+								},
+							},
+						},
+					},
+				}
+			})
+			It("errors", func() {
+				By("validating create event")
+				_, err = w.ValidateCreate(context.TODO(), &boost)
+				Expect(err).To(HaveOccurred())
+
+				By("validating update event")
+				_, err = w.ValidateUpdate(context.TODO(), nil, &boost)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		When("GlobalStartupCPUBoost has invalid MatchExpressions in pod selector", func() {
+			BeforeEach(func() {
+				boost = v1alpha1.GlobalStartupCPUBoost{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "global-boost-invalid-pod-expr",
+					},
+					Spec: v1alpha1.GlobalStartupCPUBoostSpec{
+						NamespaceSelector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"env": "prod"},
+						},
+						Template: v1alpha1.GlobalStartupCPUBoostTemplate{
+							Selector: metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{},
+									},
+								},
+							},
+							Spec: v1alpha1.StartupCPUBoostSpec{
+								ResourcePolicy: v1alpha1.ResourcePolicy{
+									ContainerPolicies: []v1alpha1.ContainerPolicy{
+										{
+											ContainerName:      v1alpha1.ContainerPolicyWildcard,
+											PercentageIncrease: &v1alpha1.PercentageIncrease{Value: 100},
+										},
+									},
+								},
+								DurationPolicy: v1alpha1.DurationPolicy{
+									Fixed: &v1alpha1.FixedDurationPolicy{
+										Value: 60,
+										Unit:  v1alpha1.FixedDurationPolicyUnitSec,
+									},
+								},
+							},
+						},
+					},
+				}
+			})
+			It("errors", func() {
+				By("validating create event")
+				_, err = w.ValidateCreate(context.TODO(), &boost)
+				Expect(err).To(HaveOccurred())
+
+				By("validating update event")
+				_, err = w.ValidateUpdate(context.TODO(), nil, &boost)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
 		When("GlobalStartupCPUBoost has no duration policy", func() {
 			BeforeEach(func() {
 				boost = v1alpha1.GlobalStartupCPUBoost{
